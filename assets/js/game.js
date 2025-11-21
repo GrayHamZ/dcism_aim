@@ -70,7 +70,7 @@ class Game {
 
     resizeCanvas() {
         // Keep 1200x800 aspect ratio but scale down if needed
-        const maxWidth = Math.min(1200, window.innerWidth - 80);
+        const maxWidth = Math.min(950, window.innerWidth - 80);
         const aspectRatio = 800 / 1200;
         const width = maxWidth;
         const height = width * aspectRatio;
