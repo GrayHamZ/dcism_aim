@@ -478,20 +478,22 @@ class Game {
         // Show modal
         modal.classList.remove('hidden');
 
-        // Setup modal close handlers (overlay and close button)
+        // Prevent overlay from closing the modal
         const overlay = modal.querySelector('.modal-overlay');
-        const closeBtn = modal.querySelector('.modal-close');
-        
-        const closeHandler = () => {
-            this.closeGameOverModal();
-        };
-        
         if (overlay) {
-            overlay.onclick = closeHandler;
+            overlay.onclick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+            };
         }
-        
+
+        // Setup close button handler only
+        const closeBtn = modal.querySelector('.modal-close');
         if (closeBtn) {
-            closeBtn.onclick = closeHandler;
+            closeBtn.onclick = () => {
+                this.closeGameOverModal();
+            };
         }
 
         // Setup retry button

@@ -52,13 +52,23 @@ class Auth {
             signupBtn.addEventListener('click', () => this.showSignupModal());
         }
 
-        // Modal close buttons
-        document.querySelectorAll('.modal-close, .modal-overlay').forEach(element => {
-            element.addEventListener('click', (e) => {
-                if (e.target.classList.contains('modal-close') || e.target.classList.contains('modal-overlay')) {
-                    this.closeModals();
+        // Modal close buttons (only for login and signup modals)
+        const loginModal = document.getElementById('loginModal');
+        const signupModal = document.getElementById('signupModal');
+        
+        [loginModal, signupModal].forEach(modal => {
+            if (modal) {
+                const closeBtn = modal.querySelector('.modal-close');
+                const overlay = modal.querySelector('.modal-overlay');
+                
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => this.closeModals());
                 }
-            });
+                
+                if (overlay) {
+                    overlay.addEventListener('click', () => this.closeModals());
+                }
+            }
         });
 
         // Switch between login and signup
@@ -176,15 +186,31 @@ class Auth {
     }
 
     closeModals() {
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.classList.add('hidden');
-        });
+        // Only close login and signup modals, NOT the game over modal
+        const loginModal = document.getElementById('loginModal');
+        const signupModal = document.getElementById('signupModal');
+        
+        if (loginModal) {
+            loginModal.classList.add('hidden');
+        }
+        
+        if (signupModal) {
+            signupModal.classList.add('hidden');
+        }
 
-        // Clear error messages
-        document.querySelectorAll('.error-message').forEach(error => {
-            error.classList.add('hidden');
-            error.textContent = '';
-        });
+        // Clear error messages (only in auth modals)
+        const loginError = document.getElementById('loginError');
+        const signupError = document.getElementById('signupError');
+        
+        if (loginError) {
+            loginError.classList.add('hidden');
+            loginError.textContent = '';
+        }
+        
+        if (signupError) {
+            signupError.classList.add('hidden');
+            signupError.textContent = '';
+        }
     }
 
     updateUI() {
