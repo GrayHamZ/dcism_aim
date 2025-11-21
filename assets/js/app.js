@@ -6,16 +6,20 @@
 import router from './router.js';
 import auth from './auth.js';
 import game from './game.js';
+import Changelog from './changelog.js';
 
 class App {
     constructor() {
         this.init();
     }
 
-    init() {
+    async init() {
         // Check screen size for mobile warning
         this.checkScreenSize();
         window.addEventListener('resize', () => this.checkScreenSize());
+
+        // Update header version from changelog
+        await Changelog.updateHeaderVersion();
 
         // Initialize authentication
         auth.updateUI();

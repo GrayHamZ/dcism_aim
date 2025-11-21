@@ -49,6 +49,13 @@ class Game {
         
         // Store timeout IDs for cleanup
         this.pendingTimeouts = [];
+
+        // Sound effects
+        this.soundEnabled = localStorage.getItem('soundEnabled') !== 'false'; // Default to enabled
+        this.sounds = {
+            hit: null,
+            miss: null
+        };
     }
 
     init() {
@@ -69,8 +76,64 @@ class Game {
 
         this.canvas.addEventListener('mousedown', (e) => this.handleClick(e));
 
+        // Initialize sound effects
+        this.initSounds();
+
         // Draw initial canvas
         this.drawCanvas();
+    }
+
+    initSounds() {
+        // Preload sound effects
+        this.sounds.hit = new Audio('assets/sfx/hit.mp3');
+        this.sounds.miss = new Audio('assets/sfx/miss.mp3');
+
+        // Set volume
+        this.sounds.hit.volume = 0.5;
+        this.sounds.miss.volume = 0.5;
+
+        // Setup sound toggle button
+        const soundToggle = document.getElementById('soundToggle');
+
+        if (soundToggle) {
+            // Set initial state
+            this.updateSoundToggleUI();
+
+            soundToggle.addEventListener('click', () => {
+                this.soundEnabled = !this.soundEnabled;
+                localStorage.setItem('soundEnabled', this.soundEnabled);
+                this.updateSoundToggleUI();
+            });
+        }
+    }
+
+    updateSoundToggleUI() {
+        const soundToggle = document.getElementById('soundToggle');
+        const soundOnIcon = document.getElementById('soundOnIcon');
+        const soundOffIcon = document.getElementById('soundOffIcon');
+
+        if (soundToggle && soundOnIcon && soundOffIcon) {
+            if (this.soundEnabled) {
+                soundToggle.classList.remove('muted');
+                soundOnIcon.classList.remove('hidden');
+                soundOffIcon.classList.add('hidden');
+            } else {
+                soundToggle.classList.add('muted');
+                soundOnIcon.classList.add('hidden');
+                soundOffIcon.classList.remove('hidden');
+            }
+        }
+    }
+
+    playSound(type) {
+        if (!this.soundEnabled) return;
+
+        const sound = this.sounds[type];
+        if (sound) {
+            // Clone and play to allow overlapping sounds
+            sound.currentTime = 0;
+            sound.play().catch(() => {}); // Ignore autoplay errors
+        }
     }
 
     resizeCanvas() {
@@ -304,6 +367,9 @@ class Game {
             this.bestStreak = this.currentStreak;
         }
 
+        // Play hit sound
+        this.playSound('hit');
+
         // Create hit ring feedback
         this.addHitRing(target.x, target.y, target.currentDiameter);
 
@@ -327,7 +393,10 @@ class Game {
     handleTargetMissed(targetIndex) {
         // Don't process if game is ending
         if (this.gameEnding) return;
-        
+
+        // Play miss sound
+        this.playSound('miss');
+
         this.lives--;
         this.targetsMissed++;
         this.currentStreak = 0;
