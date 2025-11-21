@@ -35,24 +35,32 @@ try {
     $conn = $db->getConnection();
 
     // Get top scores with user info (best score per user)
+    // Use subquery to get the actual row with the max score, not arbitrary values
     $query = "
         SELECT
             u.username,
             s.user_id,
-            MAX(s.score) as best_score,
+            s.score as best_score,
             s.survival_time,
             s.accuracy,
             s.created_at
         FROM scores s
         INNER JOIN users u ON s.user_id = u.id
         WHERE s.game_mode_id = ?
-        GROUP BY s.user_id
+        AND s.id = (
+            SELECT s2.id
+            FROM scores s2
+            WHERE s2.user_id = s.user_id
+            AND s2.game_mode_id = ?
+            ORDER BY s2.score DESC, s2.created_at ASC
+            LIMIT 1
+        )
         ORDER BY best_score DESC, s.created_at ASC
         LIMIT ? OFFSET ?
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param('iii', $gameModeId, $limit, $offset);
+    $stmt->bind_param('iiii', $gameModeId, $gameModeId, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
 
