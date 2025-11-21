@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCISM Aim Trainer</title>
+    <meta name="description" content="Web-based aim and precision training game. Improve your accuracy and reaction time with various game modes.">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar" id="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <span class="brand-text">DCISM <span class="brand-highlight">AIM</span></span>
+            </div>
+            <div class="navbar-menu">
+                <a href="#/" class="nav-link" data-route="/">Home</a>
+                <a href="#/play" class="nav-link" data-route="/play">Play</a>
+                <a href="#/leaderboard" class="nav-link" data-route="/leaderboard">Leaderboard</a>
+                <a href="#/stats" class="nav-link auth-only hidden" data-route="/stats">Stats</a>
+            </div>
+            <div class="navbar-auth">
+                <button id="loginBtn" class="btn btn-outline guest-only">Login</button>
+                <button id="signupBtn" class="btn btn-primary guest-only">Sign Up</button>
+                <span id="usernameDisplay" class="username-display auth-only hidden"></span>
+                <button id="logoutBtn" class="btn btn-outline auth-only hidden">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main id="app" class="main-content">
+        <!-- Views will be dynamically loaded here -->
+    </main>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Login</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" name="username" required
+                               autocomplete="username" placeholder="Enter your username">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" name="password" required
+                               autocomplete="current-password" placeholder="Enter your password">
+                    </div>
+                    <div class="form-group checkbox">
+                        <label>
+                            <input type="checkbox" id="rememberMe" name="remember_me">
+                            Remember me (30 days)
+                        </label>
+                    </div>
+                    <div id="loginError" class="error-message hidden"></div>
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                </form>
+                <p class="form-footer">
+                    Don't have an account? <a href="#" id="switchToSignup">Sign up here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signupModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Account</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="signupForm">
+                    <div class="form-group">
+                        <label for="signupUsername">Username</label>
+                        <input type="text" id="signupUsername" name="username" required
+                               autocomplete="username" placeholder="3-20 characters (letters, numbers, _)">
+                        <small>Only letters, numbers, and underscores allowed</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" name="password" required
+                               autocomplete="new-password" placeholder="Minimum 8 characters">
+                        <small>Must contain at least 1 letter and 1 number</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPasswordConfirm">Confirm Password</label>
+                        <input type="password" id="signupPasswordConfirm" name="password_confirm" required
+                               autocomplete="new-password" placeholder="Re-enter your password">
+                    </div>
+                    <div id="signupError" class="error-message hidden"></div>
+                    <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+                </form>
+                <p class="form-footer">
+                    Already have an account? <a href="#" id="switchToLogin">Login here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Game Over!</h2>
+            </div>
+            <div class="modal-body">
+                <div class="game-over-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Final Score</div>
+                        <div class="stat-value" id="finalScore">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Survival Time</div>
+                        <div class="stat-value" id="finalTime">00:00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Accuracy</div>
+                        <div class="stat-value" id="finalAccuracy">0%</div>
+                    </div>
+                </div>
+                <div class="game-over-details">
+                    <p><strong>Targets Hit:</strong> <span id="targetsHitDisplay">0</span></p>
+                    <p><strong>Targets Missed:</strong> <span id="targetsMissedDisplay">0</span></p>
+                    <p id="rankDisplay" class="rank-info auth-only hidden"></p>
+                    <p id="newBestDisplay" class="new-best hidden">🏆 New Personal Best!</p>
+                </div>
+                <div id="guestPrompt" class="guest-prompt guest-only hidden">
+                    <p class="highlight">Sign up now to save your score and compete on the leaderboard!</p>
+                </div>
+                <div class="game-over-actions">
+                    <button id="retryBtn" class="btn btn-primary">Play Again</button>
+                    <button id="viewStatsBtn" class="btn btn-outline auth-only hidden">View Full Stats</button>
+                    <button id="signupFromGameBtn" class="btn btn-highlight guest-only hidden">Sign Up to Save Score</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Warning -->
+    <div id="mobileWarning" class="mobile-warning hidden">
+        <div class="warning-content">
+            <h2>Screen Size Not Supported</h2>
+            <p>This game requires landscape orientation on a larger screen for optimal precision gameplay.</p>
+            <p>Please use a desktop or tablet in landscape mode.</p>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
