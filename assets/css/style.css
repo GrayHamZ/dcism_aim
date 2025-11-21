@@ -925,3 +925,130 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Pagination Controls */
+.pagination-controls {
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+}
+
+.pagination-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.pagination-info {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.pagination-rows {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.pagination-rows label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.pagination-rows select {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+}
+
+.pagination-rows select:hover,
+.pagination-rows select:focus {
+    border-color: var(--neon-cyan);
+    outline: none;
+}
+
+.pagination-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.pagination-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.pagination-page {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 var(--spacing-xs);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.pagination-page:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.pagination-page.active {
+    background: rgba(0, 245, 255, 0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.pagination-ellipsis {
+    color: var(--text-muted);
+    padding: 0 var(--spacing-xs);
+}
+
+@media (max-width: 768px) {
+    .pagination-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+
+    .pagination-info,
+    .pagination-rows,
+    .pagination-nav {
+        justify-content: center;
+    }
+}

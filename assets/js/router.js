@@ -11,6 +11,13 @@ class Router {
     constructor() {
         this.routes = {};
         this.currentRoute = null;
+        // Pagination state
+        this.leaderboardState = {
+            currentPage: 1,
+            rowsPerPage: 25,
+            totalPlayers: 0,
+            currentModeId: 1
+        };
         this.init();
     }
 
@@ -154,6 +161,9 @@ class Router {
 
     async renderLeaderboard() {
         const app = document.getElementById('app');
+        // Reset pagination state when entering leaderboard
+        this.leaderboardState.currentPage = 1;
+
         app.innerHTML = `
             <div class="leaderboard-container">
                 <div class="leaderboard-header">
@@ -162,6 +172,7 @@ class Router {
                         <div class="spinner"></div>
                     </div>
                 </div>
+                <div class="pagination-controls" id="paginationControls"></div>
                 <div class="leaderboard-table">
                     <div class="spinner"></div>
                 </div>
@@ -186,6 +197,7 @@ class Router {
             // Load first active mode's leaderboard
             const firstActiveMode = gameModes.find(m => m.is_active);
             if (firstActiveMode) {
+                this.leaderboardState.currentModeId = firstActiveMode.id;
                 await this.loadLeaderboard(firstActiveMode.id);
             }
 
@@ -200,6 +212,10 @@ class Router {
                     // Update active tab
                     document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
                     e.target.classList.add('active');
+
+                    // Reset to page 1 when switching modes
+                    this.leaderboardState.currentPage = 1;
+                    this.leaderboardState.currentModeId = modeId;
 
                     // Load leaderboard for selected mode
                     await this.loadLeaderboard(modeId);
@@ -216,10 +232,20 @@ class Router {
         const container = document.querySelector('.leaderboard-table');
         container.innerHTML = '<div class="spinner"></div>';
 
+        const { currentPage, rowsPerPage } = this.leaderboardState;
+        const offset = (currentPage - 1) * rowsPerPage;
+
         try {
-            const response = await API.getLeaderboard(gameModeId, 100, 0);
-            const { leaderboard, current_user_rank } = response.data;
+            const response = await API.getLeaderboard(gameModeId, rowsPerPage, offset);
+            const { leaderboard, current_user_rank, total_players } = response.data;
             const currentUserId = auth.getUserId();
+
+            // Update state
+            this.leaderboardState.totalPlayers = total_players;
+            const totalPages = Math.ceil(total_players / rowsPerPage);
+
+            // Render pagination controls
+            this.renderPaginationControls(totalPages, total_players);
 
             if (leaderboard.length === 0) {
                 container.innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--text-secondary);">No scores yet. Be the first to play!</p>';
@@ -262,6 +288,106 @@ class Router {
             console.error('Error loading leaderboard:', error);
             container.innerHTML = '<p class="error-message">Failed to load leaderboard data</p>';
         }
+    }
+
+    renderPaginationControls(totalPages, totalPlayers) {
+        const paginationContainer = document.getElementById('paginationControls');
+        const { currentPage, rowsPerPage } = this.leaderboardState;
+
+        if (totalPlayers === 0) {
+            paginationContainer.innerHTML = '';
+            return;
+        }
+
+        const startEntry = (currentPage - 1) * rowsPerPage + 1;
+        const endEntry = Math.min(currentPage * rowsPerPage, totalPlayers);
+
+        // Generate page numbers
+        let pageNumbers = [];
+        const maxVisiblePages = 5;
+
+        if (totalPages <= maxVisiblePages) {
+            pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+        } else {
+            if (currentPage <= 3) {
+                pageNumbers = [1, 2, 3, 4, '...', totalPages];
+            } else if (currentPage >= totalPages - 2) {
+                pageNumbers = [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+            } else {
+                pageNumbers = [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+            }
+        }
+
+        paginationContainer.innerHTML = `
+            <div class="pagination-wrapper">
+                <div class="pagination-info">
+                    <span>Showing ${startEntry}-${endEntry} of ${totalPlayers} players</span>
+                </div>
+                <div class="pagination-rows">
+                    <label>Rows per page:</label>
+                    <select id="rowsPerPageSelect">
+                        <option value="10" ${rowsPerPage === 10 ? 'selected' : ''}>10</option>
+                        <option value="25" ${rowsPerPage === 25 ? 'selected' : ''}>25</option>
+                        <option value="50" ${rowsPerPage === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${rowsPerPage === 100 ? 'selected' : ''}>100</option>
+                    </select>
+                </div>
+                <div class="pagination-nav">
+                    <button class="pagination-btn" id="prevPage" ${currentPage === 1 ? 'disabled' : ''}>
+                        &lt; Prev
+                    </button>
+                    <div class="pagination-pages">
+                        ${pageNumbers.map(page =>
+                            page === '...'
+                                ? '<span class="pagination-ellipsis">...</span>'
+                                : `<button class="pagination-page ${page === currentPage ? 'active' : ''}" data-page="${page}">${page}</button>`
+                        ).join('')}
+                    </div>
+                    <button class="pagination-btn" id="nextPage" ${currentPage === totalPages ? 'disabled' : ''}>
+                        Next &gt;
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners
+        this.attachPaginationListeners(totalPages);
+    }
+
+    attachPaginationListeners(totalPages) {
+        const rowsSelect = document.getElementById('rowsPerPageSelect');
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+
+        rowsSelect?.addEventListener('change', async (e) => {
+            this.leaderboardState.rowsPerPage = parseInt(e.target.value);
+            this.leaderboardState.currentPage = 1;
+            await this.loadLeaderboard(this.leaderboardState.currentModeId);
+        });
+
+        prevBtn?.addEventListener('click', async () => {
+            if (this.leaderboardState.currentPage > 1) {
+                this.leaderboardState.currentPage--;
+                await this.loadLeaderboard(this.leaderboardState.currentModeId);
+            }
+        });
+
+        nextBtn?.addEventListener('click', async () => {
+            if (this.leaderboardState.currentPage < totalPages) {
+                this.leaderboardState.currentPage++;
+                await this.loadLeaderboard(this.leaderboardState.currentModeId);
+            }
+        });
+
+        document.querySelectorAll('.pagination-page').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const page = parseInt(e.target.getAttribute('data-page'));
+                if (page !== this.leaderboardState.currentPage) {
+                    this.leaderboardState.currentPage = page;
+                    await this.loadLeaderboard(this.leaderboardState.currentModeId);
+                }
+            });
+        });
     }
 
     async renderStats() {
