@@ -25,6 +25,8 @@ class Game {
 
         // Target properties (from spec)
         this.targets = []; // Array to hold multiple active targets
+        this.clickFeedback = []; // Array to hold click feedback dots
+        this.hitRings = []; // Array to hold hit target ring outlines
         this.targetConfig = {
             initialDiameter: 15,
             maxDiameter: 75,
@@ -101,6 +103,8 @@ class Game {
         this.elapsedTime = 0;
         this.isRunning = true;
         this.targets = [];
+        this.clickFeedback = [];
+        this.hitRings = [];
         this.lastFrameTime = null;
         
         // Clear any existing spawn interval
@@ -193,6 +197,17 @@ class Game {
     }
 
     updateTargets(deltaTime) {
+        // Clean up expired click feedback
+        const now = Date.now();
+        this.clickFeedback = this.clickFeedback.filter(feedback => {
+            return (now - feedback.createdAt) < feedback.duration;
+        });
+        
+        // Clean up expired hit rings
+        this.hitRings = this.hitRings.filter(ring => {
+            return (now - ring.createdAt) < ring.duration;
+        });
+        
         // Update all targets and check for expired ones
         for (let i = this.targets.length - 1; i >= 0; i--) {
             const target = this.targets[i];
@@ -252,14 +267,30 @@ class Game {
             const radius = target.currentDiameter / 2;
 
             if (distance <= radius) {
-                this.handleTargetHit(i);
-                break; // Only hit one target per click
+                this.handleTargetHit(i, target);
+                this.addClickFeedback(clickX, clickY, true); // Green for hit
+                return; // Hit a target, exit function
             }
         }
-        // Note: Clicks outside targets do NOT count as misses per spec
+        
+        // If we get here, the click missed all targets
+        this.targetsMissed++;
+        this.addClickFeedback(clickX, clickY, false); // Red for miss
     }
 
-    handleTargetHit(targetIndex) {
+    addClickFeedback(x, y, isHit) {
+        const feedback = {
+            x: x,
+            y: y,
+            isHit: isHit,
+            createdAt: Date.now(),
+            duration: 500 // 500ms
+        };
+        
+        this.clickFeedback.push(feedback);
+    }
+
+    handleTargetHit(targetIndex, target) {
         this.score++;
         this.targetsHit++;
         this.currentStreak++;
@@ -267,9 +298,24 @@ class Game {
             this.bestStreak = this.currentStreak;
         }
 
+        // Create hit ring feedback
+        this.addHitRing(target.x, target.y, target.currentDiameter);
+
         // Remove the hit target from array
         this.targets.splice(targetIndex, 1);
         // Note: No need to spawn immediately - interval handles spawning
+    }
+
+    addHitRing(x, y, diameter) {
+        const ring = {
+            x: x,
+            y: y,
+            diameter: diameter,
+            createdAt: Date.now(),
+            duration: 500 // 500ms
+        };
+        
+        this.hitRings.push(ring);
     }
 
     handleTargetMissed(targetIndex) {
@@ -466,6 +512,8 @@ class Game {
         this.currentStreak = 0;
         this.bestStreak = 0;
         this.targets = [];
+        this.clickFeedback = [];
+        this.hitRings = [];
 
         // Update UI to show reset values
         this.updateUI();
@@ -485,6 +533,55 @@ class Game {
         this.ctx.fillStyle = '#0d1117';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Draw hit rings (target outlines from hits)
+        const now = Date.now();
+        this.hitRings.forEach(ring => {
+            const age = now - ring.createdAt;
+            const progress = age / ring.duration;
+            const opacity = 1 - progress; // Fade from 1 to 0
+            
+            const radius = ring.diameter / 2;
+            
+            // Draw white ring outline with glow
+            this.ctx.shadowBlur = 20 * opacity;
+            this.ctx.shadowColor = '#FFFFFF';
+            this.ctx.globalAlpha = opacity;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(ring.x, ring.y, radius, 0, Math.PI * 2);
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 3;
+            this.ctx.stroke();
+            
+            // Reset alpha and shadow
+            this.ctx.globalAlpha = 1;
+            this.ctx.shadowBlur = 0;
+        });
+        
+        // Draw click feedback dots
+        this.clickFeedback.forEach(feedback => {
+            const age = now - feedback.createdAt;
+            const progress = age / feedback.duration;
+            const opacity = 1 - progress; // Fade from 1 to 0
+            
+            // Set color based on hit/miss
+            const color = feedback.isHit ? '#00FF00' : '#FF0000'; // Green for hit, red for miss
+            
+            // Draw dot with glow
+            this.ctx.shadowBlur = 15 * opacity;
+            this.ctx.shadowColor = color;
+            this.ctx.globalAlpha = opacity;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(feedback.x, feedback.y, 5, 0, Math.PI * 2);
+            this.ctx.fillStyle = color;
+            this.ctx.fill();
+            
+            // Reset alpha and shadow
+            this.ctx.globalAlpha = 1;
+            this.ctx.shadowBlur = 0;
+        });
+        
         // Draw all targets
         if (this.isRunning) {
             this.targets.forEach(target => {
