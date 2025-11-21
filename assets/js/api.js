@@ -3,7 +3,9 @@
  * Handles all API communication with the backend
  */
 
-const API_BASE = '/DCISM_Aim/api';
+const API_BASE = window.location.hostname === 'localhost'
+    ? '/DCISM_Aim/api'
+    : '/api';
 
 class API {
     /**

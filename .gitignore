@@ -50,3 +50,4 @@ CLAUDE.md
 QUICK_START.md
 .env.example.dev
 .env.example.prod
+database-deploy.md
