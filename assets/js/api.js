@@ -67,6 +67,13 @@ class API {
         return this.request('/game-modes.php');
     }
 
+    static async startGame(gameModeId = 1) {
+        return this.request('/game/start.php', {
+            method: 'POST',
+            body: JSON.stringify({ game_mode_id: gameModeId })
+        });
+    }
+
     static async saveScore(gameData) {
         return this.request('/scores/save.php', {
             method: 'POST',

@@ -25,6 +25,9 @@ class Game {
         this.currentStreak = 0;
         this.bestStreak = 0;
 
+        // Session token for anti-cheat
+        this.sessionToken = null;
+
         // Target properties (from spec)
         this.targets = []; // Array to hold multiple active targets
         this.clickFeedback = []; // Array to hold click feedback dots
@@ -147,16 +150,16 @@ class Game {
         this.canvas.style.height = height + 'px';
     }
 
-    startGame() {
+    async startGame() {
         // Clear any pending timeouts from previous game
         this.clearPendingTimeouts();
-        
+
         // Stop any running animation loop
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
-        
+
         // Reset game state
         this.score = 0;
         this.lives = 3;
@@ -166,6 +169,7 @@ class Game {
         this.bestStreak = 0;
         this.scoreSaved = false; // Reset score saved flag for new game
         this.gameEnding = false; // Reset game ending flag
+        this.sessionToken = null; // Reset session token
         this.startTime = Date.now();
         this.elapsedTime = 0;
         this.isRunning = true;
@@ -173,11 +177,24 @@ class Game {
         this.clickFeedback = [];
         this.hitRings = [];
         this.lastFrameTime = null;
-        
+
         // Clear any existing spawn interval
         if (this.spawnIntervalId) {
             clearInterval(this.spawnIntervalId);
             this.spawnIntervalId = null;
+        }
+
+        // Get session token for authenticated users (anti-cheat)
+        if (auth.isAuthenticated()) {
+            try {
+                const response = await API.startGame(1); // Classic mode
+                if (response.success && response.data.session_token) {
+                    this.sessionToken = response.data.session_token;
+                }
+            } catch (error) {
+                console.error('Failed to start game session:', error);
+                // Continue anyway - score just won't be saved
+            }
         }
 
         // Update UI
@@ -194,7 +211,7 @@ class Game {
 
         // Spawn first target immediately
         this.spawnTarget();
-        
+
         // Set up interval to spawn targets every 0.5 seconds
         this.spawnIntervalId = setInterval(() => {
             if (this.isRunning) {
@@ -448,9 +465,9 @@ class Game {
         this.showGameOverModal(accuracy);
 
         // Save score if authenticated (only once per game)
-        if (auth.isAuthenticated() && !this.scoreSaved) {
+        if (auth.isAuthenticated() && !this.scoreSaved && this.sessionToken) {
             this.scoreSaved = true; // Mark as saved to prevent duplicates
-            
+
             try {
                 const gameData = {
                     game_mode_id: 1, // Classic mode
@@ -458,7 +475,8 @@ class Game {
                     survival_time: this.elapsedTime,
                     targets_hit: this.targetsHit,
                     targets_missed: this.targetsMissed,
-                    best_streak: this.bestStreak
+                    best_streak: this.bestStreak,
+                    session_token: this.sessionToken
                 };
 
                 const response = await API.saveScore(gameData);

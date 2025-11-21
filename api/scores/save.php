@@ -32,7 +32,8 @@ $missing = validateRequiredFields($input, [
     'score',
     'survival_time',
     'targets_hit',
-    'targets_missed'
+    'targets_missed',
+    'session_token'
 ]);
 
 if ($missing) {
@@ -46,29 +47,65 @@ $survivalTime = (int)$input['survival_time'];
 $targetsHit = (int)$input['targets_hit'];
 $targetsMissed = (int)$input['targets_missed'];
 $currentStreak = isset($input['best_streak']) ? (int)$input['best_streak'] : 0;
+$sessionToken = sanitizeInput($input['session_token']);
 
 // Calculate accuracy
 $totalTargets = $targetsHit + $targetsMissed;
 $accuracy = $totalTargets > 0 ? round(($targetsHit / $totalTargets) * 100, 2) : 0;
 
+// Timing validation: Check if score is physically possible
+// Max ~2.5 targets per second (spawn interval is 0.4s)
+// Add 1 second buffer for the initial target
+$maxPossibleScore = ceil(($survivalTime + 1) * 2.5);
+if ($score > $maxPossibleScore) {
+    sendError('Invalid score: exceeds maximum possible for survival time', 400);
+}
+
 try {
     $db = Database::getInstance();
     $conn = $db->getConnection();
 
+    // Validate session token
+    $tokenCheck = $conn->prepare("
+        SELECT id, game_mode_id, started_at
+        FROM game_sessions
+        WHERE session_token = ?
+        AND user_id = ?
+        AND is_used = FALSE
+        AND started_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+        LIMIT 1
+    ");
+    $tokenCheck->bind_param('si', $sessionToken, $userId);
+    $tokenCheck->execute();
+    $tokenResult = $tokenCheck->get_result();
+
+    if ($tokenResult->num_rows === 0) {
+        $tokenCheck->close();
+        sendError('Invalid or expired game session. Please start a new game.', 403);
+    }
+
+    $sessionData = $tokenResult->fetch_assoc();
+    $tokenCheck->close();
+
+    // Verify game mode matches
+    if ($sessionData['game_mode_id'] !== $gameModeId) {
+        sendError('Game mode mismatch with session', 400);
+    }
+
     // Check for duplicate submission (same user, mode, score, and time within last 5 seconds)
     $duplicateCheck = $conn->prepare("
-        SELECT id FROM scores 
-        WHERE user_id = ? 
-        AND game_mode_id = ? 
-        AND score = ? 
-        AND survival_time = ? 
+        SELECT id FROM scores
+        WHERE user_id = ?
+        AND game_mode_id = ?
+        AND score = ?
+        AND survival_time = ?
         AND created_at > DATE_SUB(NOW(), INTERVAL 5 SECOND)
         LIMIT 1
     ");
     $duplicateCheck->bind_param('iiii', $userId, $gameModeId, $score, $survivalTime);
     $duplicateCheck->execute();
     $duplicateResult = $duplicateCheck->get_result();
-    
+
     if ($duplicateResult->num_rows > 0) {
         $duplicateCheck->close();
         sendError('Duplicate score submission detected. Please wait before submitting again.', 429);
@@ -137,6 +174,16 @@ try {
     }
 
     $checkStmt->close();
+
+    // Mark game session as used (one-time token)
+    $markUsedStmt = $conn->prepare("
+        UPDATE game_sessions
+        SET is_used = TRUE, completed_at = NOW()
+        WHERE session_token = ?
+    ");
+    $markUsedStmt->bind_param('s', $sessionToken);
+    $markUsedStmt->execute();
+    $markUsedStmt->close();
 
     // Commit transaction
     $conn->commit();

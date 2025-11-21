@@ -177,11 +177,27 @@ function requireAuth() {
  * Set CORS headers for API
  */
 function setCorsHeaders() {
-    // Allow same-origin requests
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization');
-    header('Access-Control-Allow-Credentials: true');
+    // Get the origin from the request
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+
+    // List of allowed origins
+    $allowedOrigins = [
+        'http://localhost',
+        'http://127.0.0.1',
+        'http://localhost:80',
+        'http://127.0.0.1:80'
+    ];
+
+    // Check if origin is allowed (also allow same-origin requests with no Origin header)
+    if (empty($origin) || in_array($origin, $allowedOrigins) || strpos($origin, 'http://localhost') === 0) {
+        // Set origin header (use specific origin for credentials support)
+        if (!empty($origin)) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+        }
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+    }
 
     // Handle preflight requests
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
