@@ -41,6 +41,9 @@ class Game {
         // Animation
         this.animationId = null;
         this.lastFrameTime = 0;
+        
+        // Store timeout IDs for cleanup
+        this.pendingTimeouts = [];
     }
 
     init() {
@@ -77,6 +80,15 @@ class Game {
     }
 
     startGame() {
+        // Clear any pending timeouts from previous game
+        this.clearPendingTimeouts();
+        
+        // Stop any running animation loop
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
         // Reset game state
         this.score = 0;
         this.lives = 3;
@@ -88,6 +100,7 @@ class Game {
         this.elapsedTime = 0;
         this.isRunning = true;
         this.target = null;
+        this.lastFrameTime = null;
 
         // Update UI
         this.updateUI();
@@ -101,12 +114,26 @@ class Game {
         // Spawn first target
         this.spawnTarget();
 
-        // Start game loop
-        this.gameLoop();
+        // Start game loop with requestAnimationFrame (don't call gameLoop directly)
+        this.animationId = requestAnimationFrame((ts) => this.gameLoop(ts));
+    }
+    
+    clearPendingTimeouts() {
+        // Clear all pending timeouts
+        this.pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.pendingTimeouts = [];
     }
 
     gameLoop(timestamp = 0) {
         if (!this.isRunning) return;
+
+        // Initialize lastFrameTime on first frame
+        if (this.lastFrameTime === null) {
+            this.lastFrameTime = timestamp;
+            // Request next frame immediately, skip this frame to avoid deltaTime calculation
+            this.animationId = requestAnimationFrame((ts) => this.gameLoop(ts));
+            return;
+        }
 
         const deltaTime = timestamp - this.lastFrameTime;
         this.lastFrameTime = timestamp;
@@ -169,6 +196,12 @@ class Game {
         } else {
             // Target expired (missed)
             this.handleTargetMissed();
+            return; // Early return after handling missed target
+        }
+        
+        // Ensure diameter never goes below minimum
+        if (this.target) {
+            this.target.currentDiameter = Math.max(this.targetConfig.initialDiameter, this.target.currentDiameter);
         }
     }
 
@@ -216,11 +249,13 @@ class Game {
         this.target = null;
 
         // Spawn new target after delay
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             if (this.isRunning) {
                 this.spawnTarget();
             }
         }, this.targetConfig.spawnDelay);
+        
+        this.pendingTimeouts.push(timeoutId);
     }
 
     handleTargetMissed() {
@@ -238,11 +273,13 @@ class Game {
         }
 
         // Spawn new target after delay
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             if (this.isRunning) {
                 this.spawnTarget();
             }
         }, this.targetConfig.spawnDelay);
+        
+        this.pendingTimeouts.push(timeoutId);
     }
 
     async endGame() {
@@ -251,7 +288,11 @@ class Game {
         // Stop animation loop
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
+            this.animationId = null;
         }
+        
+        // Clear any pending timeouts
+        this.clearPendingTimeouts();
 
         // Calculate final stats
         const totalTargets = this.targetsHit + this.targetsMissed;
@@ -399,40 +440,43 @@ class Game {
 
         // Draw target if exists
         if (this.target && this.isRunning) {
-            const radius = this.target.currentDiameter / 2;
+            const radius = Math.max(0, this.target.currentDiameter / 2);
+            
+            // Only draw if radius is valid
+            if (radius > 0) {
+                // Create gradient for neon effect
+                const gradient = this.ctx.createRadialGradient(
+                    this.target.x, this.target.y, 0,
+                    this.target.x, this.target.y, radius
+                );
 
-            // Create gradient for neon effect
-            const gradient = this.ctx.createRadialGradient(
-                this.target.x, this.target.y, 0,
-                this.target.x, this.target.y, radius
-            );
+                if (this.target.phase === 'growing') {
+                    gradient.addColorStop(0, '#00F5FF');
+                    gradient.addColorStop(0.5, '#00D4FF');
+                    gradient.addColorStop(1, 'rgba(0, 245, 255, 0.3)');
+                } else {
+                    gradient.addColorStop(0, '#FF00FF');
+                    gradient.addColorStop(0.5, '#FF10F0');
+                    gradient.addColorStop(1, 'rgba(255, 0, 255, 0.3)');
+                }
 
-            if (this.target.phase === 'growing') {
-                gradient.addColorStop(0, '#00F5FF');
-                gradient.addColorStop(0.5, '#00D4FF');
-                gradient.addColorStop(1, 'rgba(0, 245, 255, 0.3)');
-            } else {
-                gradient.addColorStop(0, '#FF00FF');
-                gradient.addColorStop(0.5, '#FF10F0');
-                gradient.addColorStop(1, 'rgba(255, 0, 255, 0.3)');
+                // Draw outer glow
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = this.target.phase === 'growing' ? '#00F5FF' : '#FF00FF';
+
+                // Draw target circle
+                this.ctx.beginPath();
+                this.ctx.arc(this.target.x, this.target.y, radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+
+                // Draw center dot
+                this.ctx.shadowBlur = 0;
+                this.ctx.beginPath();
+                this.ctx.arc(this.target.x, this.target.y, 3, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fill();
             }
-
-            // Draw outer glow
-            this.ctx.shadowBlur = 20;
-            this.ctx.shadowColor = this.target.phase === 'growing' ? '#00F5FF' : '#FF00FF';
-
-            // Draw target circle
-            this.ctx.beginPath();
-            this.ctx.arc(this.target.x, this.target.y, radius, 0, Math.PI * 2);
-            this.ctx.fillStyle = gradient;
-            this.ctx.fill();
-
-            // Draw center dot
-            this.ctx.shadowBlur = 0;
-            this.ctx.beginPath();
-            this.ctx.arc(this.target.x, this.target.y, 3, 0, Math.PI * 2);
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.fill();
         }
     }
 
