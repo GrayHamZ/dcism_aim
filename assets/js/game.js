@@ -111,6 +111,9 @@ class Game {
             startBtn.style.display = 'none';
         }
 
+        // Disable navigation during game
+        this.setNavigationState(false);
+
         // Spawn first target
         this.spawnTarget();
 
@@ -285,6 +288,9 @@ class Game {
     async endGame() {
         this.isRunning = false;
 
+        // Re-enable navigation
+        this.setNavigationState(true);
+
         // Stop animation loop
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
@@ -423,6 +429,9 @@ class Game {
             modal.classList.add('hidden');
         }
 
+        // Re-enable navigation
+        this.setNavigationState(true);
+
         // Reset and show start button
         const startBtn = document.getElementById('startGameBtn');
         if (startBtn) {
@@ -511,6 +520,31 @@ class Game {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Check if game is currently active
+    isGameActive() {
+        return this.isRunning;
+    }
+
+    // Disable navigation during active game
+    setNavigationState(enabled) {
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            if (enabled) {
+                link.classList.remove('disabled');
+                link.style.pointerEvents = '';
+                link.style.opacity = '';
+            } else {
+                // Only disable non-play links
+                const route = link.getAttribute('data-route');
+                if (route !== '/play') {
+                    link.classList.add('disabled');
+                    link.style.pointerEvents = 'none';
+                    link.style.opacity = '0.5';
+                }
+            }
+        });
     }
 }
 

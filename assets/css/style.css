@@ -123,6 +123,12 @@ body {
     text-shadow: 0 0 8px var(--neon-cyan);
 }
 
+.nav-link.disabled {
+    cursor: not-allowed;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
 .navbar-auth {
     display: flex;
     gap: var(--spacing-md);

@@ -36,6 +36,25 @@ class Router {
         const hash = window.location.hash.slice(1) || '/';
         const path = hash.split('?')[0];
 
+        // Check if trying to navigate away from active game
+        if (this.currentRoute === '/play' && path !== '/play' && window.Game && window.Game.isGameActive()) {
+            const confirmLeave = confirm('You have an active game in progress. Leaving will end your current game. Are you sure?');
+            if (!confirmLeave) {
+                // Prevent navigation by restoring the hash
+                window.location.hash = '#/play';
+                return;
+            } else {
+                // Force end the game
+                window.Game.isRunning = false;
+                window.Game.setNavigationState(true);
+                if (window.Game.animationId) {
+                    cancelAnimationFrame(window.Game.animationId);
+                    window.Game.animationId = null;
+                }
+                window.Game.clearPendingTimeouts();
+            }
+        }
+
         this.currentRoute = path;
 
         if (this.routes[path]) {
