@@ -413,6 +413,22 @@ class Game {
         // Show modal
         modal.classList.remove('hidden');
 
+        // Setup modal close handlers (overlay and close button)
+        const overlay = modal.querySelector('.modal-overlay');
+        const closeBtn = modal.querySelector('.modal-close');
+        
+        const closeHandler = () => {
+            this.closeGameOverModal();
+        };
+        
+        if (overlay) {
+            overlay.onclick = closeHandler;
+        }
+        
+        if (closeBtn) {
+            closeBtn.onclick = closeHandler;
+        }
+
         // Setup retry button
         const retryBtn = document.getElementById('retryBtn');
         if (retryBtn) {
@@ -440,6 +456,19 @@ class Game {
 
         // Re-enable navigation
         this.setNavigationState(true);
+
+        // Reset game state to initial values
+        this.score = 0;
+        this.lives = 3;
+        this.elapsedTime = 0;
+        this.targetsHit = 0;
+        this.targetsMissed = 0;
+        this.currentStreak = 0;
+        this.bestStreak = 0;
+        this.targets = [];
+
+        // Update UI to show reset values
+        this.updateUI();
 
         // Reset and show start button
         const startBtn = document.getElementById('startGameBtn');
