@@ -24,15 +24,16 @@ class Game {
         this.bestStreak = 0;
 
         // Target properties (from spec)
-        this.target = null;
+        this.targets = []; // Array to hold multiple active targets
         this.targetConfig = {
             initialDiameter: 15,
             maxDiameter: 75,
-            growthDuration: 1200, // 1.2 seconds
-            shrinkDuration: 800,  // 0.8 seconds
-            totalLifespan: 2000,  // 2.0 seconds
-            spawnDelay: 300       // 0.3 seconds after hit/miss
+            growthDuration: 2000, // 2.0 seconds
+            shrinkDuration: 2000,  // 2.0 seconds
+            totalLifespan: 4000,  // 4.0 seconds
+            spawnInterval: 400    // 0.5 seconds between spawns
         };
+        this.spawnIntervalId = null; // Store interval ID for cleanup
 
         // Click spam prevention
         this.lastClickTime = 0;
@@ -99,8 +100,14 @@ class Game {
         this.startTime = Date.now();
         this.elapsedTime = 0;
         this.isRunning = true;
-        this.target = null;
+        this.targets = [];
         this.lastFrameTime = null;
+        
+        // Clear any existing spawn interval
+        if (this.spawnIntervalId) {
+            clearInterval(this.spawnIntervalId);
+            this.spawnIntervalId = null;
+        }
 
         // Update UI
         this.updateUI();
@@ -114,8 +121,15 @@ class Game {
         // Disable navigation during game
         this.setNavigationState(false);
 
-        // Spawn first target
+        // Spawn first target immediately
         this.spawnTarget();
+        
+        // Set up interval to spawn targets every 0.5 seconds
+        this.spawnIntervalId = setInterval(() => {
+            if (this.isRunning) {
+                this.spawnTarget();
+            }
+        }, this.targetConfig.spawnInterval);
 
         // Start game loop with requestAnimationFrame (don't call gameLoop directly)
         this.animationId = requestAnimationFrame((ts) => this.gameLoop(ts));
@@ -144,10 +158,8 @@ class Game {
         // Update elapsed time
         this.elapsedTime = Math.floor((Date.now() - this.startTime) / 1000);
 
-        // Update target
-        if (this.target) {
-            this.updateTarget(deltaTime);
-        }
+        // Update all targets
+        this.updateTargets(deltaTime);
 
         // Draw canvas
         this.drawCanvas();
@@ -167,7 +179,8 @@ class Game {
         const x = margin + Math.random() * (this.canvas.width - margin * 2);
         const y = margin + Math.random() * (this.canvas.height - margin * 2);
 
-        this.target = {
+        const newTarget = {
+            id: Date.now() + Math.random(), // Unique ID for each target
             x: x,
             y: y,
             currentDiameter: this.targetConfig.initialDiameter,
@@ -175,41 +188,43 @@ class Game {
             phase: 'growing', // 'growing' or 'shrinking'
             spawnTime: Date.now()
         };
+        
+        this.targets.push(newTarget);
     }
 
-    updateTarget(deltaTime) {
-        if (!this.target) return;
+    updateTargets(deltaTime) {
+        // Update all targets and check for expired ones
+        for (let i = this.targets.length - 1; i >= 0; i--) {
+            const target = this.targets[i];
+            target.age += deltaTime;
 
-        this.target.age += deltaTime;
-
-        // Determine phase
-        if (this.target.age < this.targetConfig.growthDuration) {
-            this.target.phase = 'growing';
-            // Linear growth
-            const progress = this.target.age / this.targetConfig.growthDuration;
-            this.target.currentDiameter = this.targetConfig.initialDiameter +
-                (this.targetConfig.maxDiameter - this.targetConfig.initialDiameter) * progress;
-        } else if (this.target.age < this.targetConfig.totalLifespan) {
-            this.target.phase = 'shrinking';
-            // Linear shrink
-            const shrinkAge = this.target.age - this.targetConfig.growthDuration;
-            const progress = shrinkAge / this.targetConfig.shrinkDuration;
-            this.target.currentDiameter = this.targetConfig.maxDiameter -
-                (this.targetConfig.maxDiameter - this.targetConfig.initialDiameter) * progress;
-        } else {
-            // Target expired (missed)
-            this.handleTargetMissed();
-            return; // Early return after handling missed target
-        }
-        
-        // Ensure diameter never goes below minimum
-        if (this.target) {
-            this.target.currentDiameter = Math.max(this.targetConfig.initialDiameter, this.target.currentDiameter);
+            // Determine phase
+            if (target.age < this.targetConfig.growthDuration) {
+                target.phase = 'growing';
+                // Linear growth
+                const progress = target.age / this.targetConfig.growthDuration;
+                target.currentDiameter = this.targetConfig.initialDiameter +
+                    (this.targetConfig.maxDiameter - this.targetConfig.initialDiameter) * progress;
+            } else if (target.age < this.targetConfig.totalLifespan) {
+                target.phase = 'shrinking';
+                // Linear shrink
+                const shrinkAge = target.age - this.targetConfig.growthDuration;
+                const progress = shrinkAge / this.targetConfig.shrinkDuration;
+                target.currentDiameter = this.targetConfig.maxDiameter -
+                    (this.targetConfig.maxDiameter - this.targetConfig.initialDiameter) * progress;
+            } else {
+                // Target expired (missed)
+                this.handleTargetMissed(i);
+                continue; // Skip to next target
+            }
+            
+            // Ensure diameter never goes below minimum
+            target.currentDiameter = Math.max(this.targetConfig.initialDiameter, target.currentDiameter);
         }
     }
 
     handleClick(event) {
-        if (!this.isRunning || !this.target) return;
+        if (!this.isRunning || this.targets.length === 0) return;
 
         // Anti-spam protection
         const now = Date.now();
@@ -226,21 +241,25 @@ class Game {
         const clickX = (event.clientX - rect.left) * scaleX;
         const clickY = (event.clientY - rect.top) * scaleY;
 
-        // Check if click is within target
-        const distance = Math.sqrt(
-            Math.pow(clickX - this.target.x, 2) +
-            Math.pow(clickY - this.target.y, 2)
-        );
+        // Check all targets, from newest to oldest (reverse order for better UX)
+        for (let i = this.targets.length - 1; i >= 0; i--) {
+            const target = this.targets[i];
+            const distance = Math.sqrt(
+                Math.pow(clickX - target.x, 2) +
+                Math.pow(clickY - target.y, 2)
+            );
 
-        const radius = this.target.currentDiameter / 2;
+            const radius = target.currentDiameter / 2;
 
-        if (distance <= radius) {
-            this.handleTargetHit();
+            if (distance <= radius) {
+                this.handleTargetHit(i);
+                break; // Only hit one target per click
+            }
         }
-        // Note: Clicks outside target do NOT count as misses per spec
+        // Note: Clicks outside targets do NOT count as misses per spec
     }
 
-    handleTargetHit() {
+    handleTargetHit(targetIndex) {
         this.score++;
         this.targetsHit++;
         this.currentStreak++;
@@ -248,41 +267,25 @@ class Game {
             this.bestStreak = this.currentStreak;
         }
 
-        // Remove current target
-        this.target = null;
-
-        // Spawn new target after delay
-        const timeoutId = setTimeout(() => {
-            if (this.isRunning) {
-                this.spawnTarget();
-            }
-        }, this.targetConfig.spawnDelay);
-        
-        this.pendingTimeouts.push(timeoutId);
+        // Remove the hit target from array
+        this.targets.splice(targetIndex, 1);
+        // Note: No need to spawn immediately - interval handles spawning
     }
 
-    handleTargetMissed() {
+    handleTargetMissed(targetIndex) {
         this.lives--;
         this.targetsMissed++;
         this.currentStreak = 0;
 
-        // Remove current target
-        this.target = null;
+        // Remove the expired target from array
+        this.targets.splice(targetIndex, 1);
 
         // Check game over
         if (this.lives <= 0) {
             this.endGame();
             return;
         }
-
-        // Spawn new target after delay
-        const timeoutId = setTimeout(() => {
-            if (this.isRunning) {
-                this.spawnTarget();
-            }
-        }, this.targetConfig.spawnDelay);
-        
-        this.pendingTimeouts.push(timeoutId);
+        // Note: No need to spawn immediately - interval handles spawning
     }
 
     async endGame() {
@@ -295,6 +298,12 @@ class Game {
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
+        }
+        
+        // Stop spawn interval
+        if (this.spawnIntervalId) {
+            clearInterval(this.spawnIntervalId);
+            this.spawnIntervalId = null;
         }
         
         // Clear any pending timeouts
@@ -447,45 +456,47 @@ class Game {
         this.ctx.fillStyle = '#0d1117';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw target if exists
-        if (this.target && this.isRunning) {
-            const radius = Math.max(0, this.target.currentDiameter / 2);
-            
-            // Only draw if radius is valid
-            if (radius > 0) {
-                // Create gradient for neon effect
-                const gradient = this.ctx.createRadialGradient(
-                    this.target.x, this.target.y, 0,
-                    this.target.x, this.target.y, radius
-                );
+        // Draw all targets
+        if (this.isRunning) {
+            this.targets.forEach(target => {
+                const radius = Math.max(0, target.currentDiameter / 2);
+                
+                // Only draw if radius is valid
+                if (radius > 0) {
+                    // Create gradient for neon effect
+                    const gradient = this.ctx.createRadialGradient(
+                        target.x, target.y, 0,
+                        target.x, target.y, radius
+                    );
 
-                if (this.target.phase === 'growing') {
-                    gradient.addColorStop(0, '#00F5FF');
-                    gradient.addColorStop(0.5, '#00D4FF');
-                    gradient.addColorStop(1, 'rgba(0, 245, 255, 0.3)');
-                } else {
-                    gradient.addColorStop(0, '#FF00FF');
-                    gradient.addColorStop(0.5, '#FF10F0');
-                    gradient.addColorStop(1, 'rgba(255, 0, 255, 0.3)');
+                    if (target.phase === 'growing') {
+                        gradient.addColorStop(0, '#00F5FF');
+                        gradient.addColorStop(0.5, '#00D4FF');
+                        gradient.addColorStop(1, 'rgba(0, 245, 255, 0.3)');
+                    } else {
+                        gradient.addColorStop(0, '#FF00FF');
+                        gradient.addColorStop(0.5, '#FF10F0');
+                        gradient.addColorStop(1, 'rgba(255, 0, 255, 0.3)');
+                    }
+
+                    // Draw outer glow
+                    this.ctx.shadowBlur = 20;
+                    this.ctx.shadowColor = target.phase === 'growing' ? '#00F5FF' : '#FF00FF';
+
+                    // Draw target circle
+                    this.ctx.beginPath();
+                    this.ctx.arc(target.x, target.y, radius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fill();
+
+                    // Draw center dot
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.beginPath();
+                    this.ctx.arc(target.x, target.y, 3, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fill();
                 }
-
-                // Draw outer glow
-                this.ctx.shadowBlur = 20;
-                this.ctx.shadowColor = this.target.phase === 'growing' ? '#00F5FF' : '#FF00FF';
-
-                // Draw target circle
-                this.ctx.beginPath();
-                this.ctx.arc(this.target.x, this.target.y, radius, 0, Math.PI * 2);
-                this.ctx.fillStyle = gradient;
-                this.ctx.fill();
-
-                // Draw center dot
-                this.ctx.shadowBlur = 0;
-                this.ctx.beginPath();
-                this.ctx.arc(this.target.x, this.target.y, 3, 0, Math.PI * 2);
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.fill();
-            }
+            });
         }
     }
 
