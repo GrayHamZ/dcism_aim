@@ -12,6 +12,8 @@ class Game {
         this.ctx = null;
         this.isRunning = false;
         this.isPaused = false;
+        this.scoreSaved = false; // Flag to prevent duplicate score submissions
+        this.gameEnding = false; // Flag to prevent multiple endGame calls
 
         // Game state
         this.score = 0;
@@ -65,7 +67,7 @@ class Game {
             startBtn.addEventListener('click', () => this.startGame());
         }
 
-        this.canvas.addEventListener('click', (e) => this.handleClick(e));
+        this.canvas.addEventListener('mousedown', (e) => this.handleClick(e));
 
         // Draw initial canvas
         this.drawCanvas();
@@ -99,6 +101,8 @@ class Game {
         this.targetsMissed = 0;
         this.currentStreak = 0;
         this.bestStreak = 0;
+        this.scoreSaved = false; // Reset score saved flag for new game
+        this.gameEnding = false; // Reset game ending flag
         this.startTime = Date.now();
         this.elapsedTime = 0;
         this.isRunning = true;
@@ -228,8 +232,10 @@ class Game {
                 target.currentDiameter = this.targetConfig.maxDiameter -
                     (this.targetConfig.maxDiameter - this.targetConfig.initialDiameter) * progress;
             } else {
-                // Target expired (missed)
-                this.handleTargetMissed(i);
+                // Target expired (missed) - but only process if game is still running
+                if (!this.gameEnding) {
+                    this.handleTargetMissed(i);
+                }
                 continue; // Skip to next target
             }
             
@@ -319,6 +325,9 @@ class Game {
     }
 
     handleTargetMissed(targetIndex) {
+        // Don't process if game is ending
+        if (this.gameEnding) return;
+        
         this.lives--;
         this.targetsMissed++;
         this.currentStreak = 0;
@@ -327,7 +336,7 @@ class Game {
         this.targets.splice(targetIndex, 1);
 
         // Check game over
-        if (this.lives <= 0) {
+        if (this.lives <= 0 && !this.gameEnding) {
             this.endGame();
             return;
         }
@@ -335,7 +344,14 @@ class Game {
     }
 
     async endGame() {
+        // Prevent multiple simultaneous calls
+        if (this.gameEnding) return;
+        this.gameEnding = true;
+        
         this.isRunning = false;
+
+        // Immediately clear all targets to prevent further processing
+        this.targets = [];
 
         // Re-enable navigation
         this.setNavigationState(true);
@@ -362,8 +378,10 @@ class Game {
         // Show game over modal
         this.showGameOverModal(accuracy);
 
-        // Save score if authenticated
-        if (auth.isAuthenticated()) {
+        // Save score if authenticated (only once per game)
+        if (auth.isAuthenticated() && !this.scoreSaved) {
+            this.scoreSaved = true; // Mark as saved to prevent duplicates
+            
             try {
                 const gameData = {
                     game_mode_id: 1, // Classic mode
@@ -393,6 +411,7 @@ class Game {
                 }
             } catch (error) {
                 console.error('Error saving score:', error);
+                this.scoreSaved = false; // Reset flag on error to allow retry
             }
         } else {
             // Guest mode: Save score to sessionStorage

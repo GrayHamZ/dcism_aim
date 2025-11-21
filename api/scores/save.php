@@ -55,6 +55,26 @@ try {
     $db = Database::getInstance();
     $conn = $db->getConnection();
 
+    // Check for duplicate submission (same user, mode, score, and time within last 5 seconds)
+    $duplicateCheck = $conn->prepare("
+        SELECT id FROM scores 
+        WHERE user_id = ? 
+        AND game_mode_id = ? 
+        AND score = ? 
+        AND survival_time = ? 
+        AND created_at > DATE_SUB(NOW(), INTERVAL 5 SECOND)
+        LIMIT 1
+    ");
+    $duplicateCheck->bind_param('iiii', $userId, $gameModeId, $score, $survivalTime);
+    $duplicateCheck->execute();
+    $duplicateResult = $duplicateCheck->get_result();
+    
+    if ($duplicateResult->num_rows > 0) {
+        $duplicateCheck->close();
+        sendError('Duplicate score submission detected. Please wait before submitting again.', 429);
+    }
+    $duplicateCheck->close();
+
     // Start transaction
     $conn->begin_transaction();
 
