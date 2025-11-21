@@ -1,0 +1,16 @@
+{
+  "version": "v1.0.0",
+  "entries": [
+    {
+      "build": "v1.0.0",
+      "date": "2025-01-21",
+      "changes": {
+        "added": [
+          "Initial release of the application."
+        ],
+        "changed": [],
+        "fixed": []
+      }
+    }
+  ]
+}

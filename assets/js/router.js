@@ -5,6 +5,7 @@
 
 import auth from './auth.js';
 import API from './api.js';
+import Changelog from './changelog.js';
 
 class Router {
     constructor() {
@@ -19,6 +20,7 @@ class Router {
         this.register('/play', () => this.renderPlay());
         this.register('/leaderboard', () => this.renderLeaderboard());
         this.register('/stats', () => this.renderStats());
+        this.register('/changelog', () => this.renderChangelog());
 
         // Listen for hash changes
         window.addEventListener('hashchange', () => this.handleRoute());
@@ -78,8 +80,10 @@ class Router {
         });
     }
 
-    renderHome() {
+    async renderHome() {
         const app = document.getElementById('app');
+        const changelogSection = await Changelog.renderSection(5);
+
         app.innerHTML = `
             <div class="home-view">
                 <h1>DCISM AIM TRAINER</h1>
@@ -87,8 +91,12 @@ class Router {
                 <button class="btn btn-primary" onclick="window.location.hash='#/play'" style="font-size: 1.2rem; padding: 1rem 2rem;">
                     Start Training
                 </button>
+                ${changelogSection}
             </div>
         `;
+
+        // Update header version badge
+        Changelog.updateHeaderVersion();
     }
 
     renderPlay() {
@@ -344,6 +352,12 @@ class Router {
                 <button class="btn btn-primary" onclick="window.location.hash='#/'">Go Home</button>
             </div>
         `;
+    }
+
+    async renderChangelog() {
+        const app = document.getElementById('app');
+        const changelogPage = await Changelog.renderFullPage();
+        app.innerHTML = changelogPage;
     }
 }
 
