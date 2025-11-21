@@ -86,10 +86,9 @@ class Router {
 
         app.innerHTML = `
             <div class="home-view">
-                <h1>DCISM AIM TRAINER</h1>
-                <p>Test your precision and reaction time with our aim training game. Click targets before they disappear and climb the leaderboard!</p>
+                <h1>WELCOME TO DCISM AIM</h1>
                 <button class="btn btn-primary" onclick="window.location.hash='#/play'" style="font-size: 1.2rem; padding: 1rem 2rem;">
-                    Start Training
+                    Start AIMING
                 </button>
                 ${changelogSection}
             </div>
