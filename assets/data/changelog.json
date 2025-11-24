@@ -1,6 +1,22 @@
 {
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "entries": [
+      {
+      "build": "v1.0.1",
+      "date": "2025-11-24",
+      "changes": {
+        "added": [
+          "Added the ability to change username.",
+          "Username change cooldown added to prevent spamming."
+        ],
+        "changed": [
+          "Invalid or profane username will be inelligible for the leaderboard.",
+          "Username validation includes profanity check.",
+          "Players can become inelligible for the leaderboard if they are found to be cheating."
+        ],
+        "fixed": []
+      }
+    },
     {
       "build": "v1.0.0",
       "date": "2025-01-21",

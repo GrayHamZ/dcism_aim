@@ -138,28 +138,138 @@ function startSession() {
 }
 
 /**
- * Check if user is authenticated
+ * Generate and store authentication token
+ * @param int $userId
+ * @return string|false Token on success, false on failure
+ */
+function generateToken($userId) {
+    try {
+        $db = Database::getInstance();
+        $conn = $db->getConnection();
+        
+        // Generate secure random token
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+        
+        // Store in database
+        $stmt = $conn->prepare("INSERT INTO user_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
+        $stmt->bind_param('iss', $userId, $token, $expiresAt);
+        
+        if ($stmt->execute()) {
+            $stmt->close();
+            return $token;
+        }
+        
+        $stmt->close();
+        return false;
+    } catch (Exception $e) {
+        error_log('Token generation error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Validate authentication token
+ * @param string $token
+ * @return int|false User ID on success, false on failure
+ */
+function validateToken($token) {
+    try {
+        $db = Database::getInstance();
+        $conn = $db->getConnection();
+        
+        $stmt = $conn->prepare("SELECT user_id FROM user_tokens WHERE token = ? AND expires_at > NOW()");
+        $stmt->bind_param('s', $token);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            $stmt->close();
+            return (int)$row['user_id'];
+        }
+        
+        $stmt->close();
+        return false;
+    } catch (Exception $e) {
+        error_log('Token validation error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Check if user is authenticated (via Session or Token)
  * @return bool
  */
 function isAuthenticated() {
+    // Check for Bearer token first
+    $headers = getallheaders();
+    $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+    
+    if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        $token = $matches[1];
+        $userId = validateToken($token);
+        if ($userId) {
+            // Set session for compatibility if needed, or just return true
+            // For now, we'll rely on the token validation
+            return true;
+        }
+    }
+
     startSession();
     return isset($_SESSION['user_id']) && isset($_SESSION['username']);
 }
 
 /**
- * Get current user ID from session
+ * Get current user ID from session or token
  * @return int|null
  */
 function getCurrentUserId() {
+    // Check for Bearer token first
+    $headers = getallheaders();
+    $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+    
+    if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        $token = $matches[1];
+        $userId = validateToken($token);
+        if ($userId) {
+            return $userId;
+        }
+    }
+
     startSession();
     return $_SESSION['user_id'] ?? null;
 }
 
 /**
- * Get current username from session
+ * Get current username from session or database (via token)
  * @return string|null
  */
 function getCurrentUsername() {
+    // Check for Bearer token first
+    $headers = getallheaders();
+    $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+    
+    if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        $token = $matches[1];
+        $userId = validateToken($token);
+        if ($userId) {
+            // Fetch username from DB
+            try {
+                $db = Database::getInstance();
+                $conn = $db->getConnection();
+                $stmt = $conn->prepare("SELECT username FROM users WHERE id = ?");
+                $stmt->bind_param('i', $userId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($row = $result->fetch_assoc()) {
+                    return $row['username'];
+                }
+            } catch (Exception $e) {
+                return null;
+            }
+        }
+    }
+
     startSession();
     return $_SESSION['username'] ?? null;
 }

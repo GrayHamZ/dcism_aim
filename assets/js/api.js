@@ -18,10 +18,24 @@ class API {
         try {
             const url = `${API_BASE}${endpoint}`;
 
+            // Get token from sessionStorage
+            const savedUser = sessionStorage.getItem('user');
+            let token = null;
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                token = user.token;
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const defaultOptions = {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 credentials: 'same-origin'
             };
 
@@ -90,6 +104,13 @@ class API {
     static async getUserStats(userId = null, gameModeId = 1) {
         const params = userId ? `user_id=${userId}&mode=${gameModeId}` : `mode=${gameModeId}`;
         return this.request(`/user/stats.php?${params}`);
+    }
+
+    static async changeUsername(newUsername) {
+        return this.request('/user/change-username.php', {
+            method: 'POST',
+            body: JSON.stringify({ new_username: newUsername })
+        });
     }
 }
 

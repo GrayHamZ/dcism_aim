@@ -87,12 +87,23 @@ class Router {
         });
     }
 
+    async getChangelogSection() {
+        return await Changelog.renderSection(5);
+    }
+
     async renderHome() {
         const app = document.getElementById('app');
-        const changelogSection = await Changelog.renderSection(5);
+        const changelogSection = await this.getChangelogSection();
 
         app.innerHTML = `
             <div class="home-view">
+                ${auth.user && auth.user.leaderboard_illegible ? `
+                    <div class="warning-banner" style="background: rgba(255, 0, 0, 0.2); border: 1px solid var(--neon-magenta); padding: 1rem; margin-bottom: 2rem; border-radius: 8px;">
+                        <h3 style="color: var(--neon-magenta); margin-top: 0;">⚠️ Account Restricted</h3>
+                        <p>Your account is currently ineligible for the leaderboard.</p>
+                        ${auth.user.ban_reason ? `<p><strong>Reason:</strong> ${auth.user.ban_reason}</p>` : ''}
+                    </div>
+                ` : ''}
                 <h1>WELCOME TO DCISM AIM</h1>
                 <button class="btn btn-primary" onclick="window.location.hash='#/play'" style="font-size: 1.2rem; padding: 1rem 2rem;">
                     Start AIMING
@@ -269,9 +280,9 @@ class Router {
                             <tr class="${entry.user_id === currentUserId ? 'current-user' : ''}">
                                 <td>
                                     ${entry.rank <= 3 ?
-                                        `<span class="rank-badge ${entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : 'bronze'}">${entry.rank}</span>` :
-                                        entry.rank
-                                    }
+                    `<span class="rank-badge ${entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : 'bronze'}">${entry.rank}</span>` :
+                    entry.rank
+                }
                                 </td>
                                 <td><strong>${entry.username}</strong></td>
                                 <td>${entry.score}</td>
@@ -338,10 +349,10 @@ class Router {
                     </button>
                     <div class="pagination-pages">
                         ${pageNumbers.map(page =>
-                            page === '...'
-                                ? '<span class="pagination-ellipsis">...</span>'
-                                : `<button class="pagination-page ${page === currentPage ? 'active' : ''}" data-page="${page}">${page}</button>`
-                        ).join('')}
+            page === '...'
+                ? '<span class="pagination-ellipsis">...</span>'
+                : `<button class="pagination-page ${page === currentPage ? 'active' : ''}" data-page="${page}">${page}</button>`
+        ).join('')}
                     </div>
                     <button class="pagination-btn" id="nextPage" ${currentPage === totalPages ? 'disabled' : ''}>
                         Next &gt;
@@ -402,21 +413,79 @@ class Router {
             <div class="stats-container">
                 <div class="stats-header">
                     <h1>Player Statistics</h1>
-                    <p style="color: var(--neon-green); font-size: 1.2rem;">${auth.getUsername()}</p>
+                    <div style="display: flex; align-items: center; gap: 1rem; justify-content: center;">
+                        <p style="color: var(--neon-green); font-size: 1.2rem; margin: 0;">${auth.getUsername()}</p>
+                        <button id="changeUsernameBtn" class="btn btn-outline btn-sm" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Change Username</button>
+                    </div>
                 </div>
                 <div class="spinner"></div>
+            </div>
+
+            <!-- Change Username Modal -->
+            <div id="changeUsernameModal" class="modal hidden">
+                <div class="modal-overlay"></div>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Change Username</h2>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="changeUsernameForm">
+                            <div class="form-group">
+                                <label for="newUsername">New Username</label>
+                                <input type="text" id="newUsername" name="new_username" required
+                                       placeholder="3-20 characters (letters, numbers, _)">
+                                <small>Only letters, numbers, and underscores allowed</small>
+                            </div>
+                            <div id="changeUsernameError" class="error-message hidden"></div>
+                            <div id="changeUsernameSuccess" class="success-message hidden" style="color: var(--neon-green); margin-bottom: 1rem;"></div>
+                            <button type="submit" class="btn btn-primary btn-block">Update Username</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         `;
 
         try {
             const response = await API.getUserStats(auth.getUserId(), 1);
-            const { stats, rank, recent_games } = response.data;
+            const { stats, rank, recent_games, user } = response.data;
+
+            // Update auth user with fresh data (in case of status changes)
+            if (user && auth.user && auth.user.user_id === user.id) {
+                auth.user = { ...auth.user, ...user };
+                // Ensure mapping matches login response structure if needed, 
+                // but stats returns 'id' vs login 'user_id'. 
+                // Let's be careful. Login returns { user_id, username, ... }
+                // Stats returns { id, username, ... }
+                // We need to map 'id' to 'user_id' to maintain consistency if we replace the whole object.
+                // Or just update specific fields.
+                auth.user.leaderboard_illegible = user.leaderboard_illegible;
+                auth.user.ban_reason = user.ban_reason;
+                auth.user.last_username_change = user.last_username_change;
+                sessionStorage.setItem('user', JSON.stringify(auth.user));
+            }
 
             const container = document.querySelector('.stats-container');
             container.innerHTML = `
                 <div class="stats-header">
                     <h1>Player Statistics</h1>
-                    <p style="color: var(--neon-green); font-size: 1.2rem;">${auth.getUsername()}</p>
+                    <div style="display: flex; align-items: center; gap: 1rem; justify-content: center;">
+                        <p style="color: var(--neon-green); font-size: 1.2rem; margin: 0;">${auth.getUsername()}</p>
+                        ${(() => {
+                    if (response.data.user.last_username_change) {
+                        const lastChange = new Date(response.data.user.last_username_change);
+                        const now = new Date();
+                        const diffTime = Math.abs(now - lastChange);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        if (diffDays < 10) {
+                            const remaining = 10 - diffDays;
+                            return `<button class="btn btn-outline btn-sm" disabled style="font-size: 0.8rem; padding: 0.2rem 0.5rem; opacity: 0.5; cursor: not-allowed;">Available in ${remaining} days</button>`;
+                        }
+                    }
+                    return `<button id="changeUsernameBtn" class="btn btn-outline btn-sm" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;">Change Username</button>`;
+                })()}
+                    </div>
                 </div>
 
                 <div class="stats-grid">
@@ -477,21 +546,82 @@ class Router {
                 </div>
             `;
 
+            // Attach listeners
+            this.attachChangeUsernameListeners();
+
         } catch (error) {
             console.error('Error loading stats:', error);
             app.innerHTML = '<p class="error-message">Failed to load statistics</p>';
         }
     }
 
+    attachChangeUsernameListeners() {
+        const btn = document.getElementById('changeUsernameBtn');
+        const modal = document.getElementById('changeUsernameModal');
+        const form = document.getElementById('changeUsernameForm');
+        const closeBtn = modal?.querySelector('.modal-close');
+        const overlay = modal?.querySelector('.modal-overlay');
+
+        if (btn && modal) {
+            btn.addEventListener('click', () => {
+                modal.classList.remove('hidden');
+            });
+        }
+
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            document.getElementById('changeUsernameError').classList.add('hidden');
+            document.getElementById('changeUsernameSuccess').classList.add('hidden');
+            form.reset();
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (overlay) overlay.addEventListener('click', closeModal);
+
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newUsername = document.getElementById('newUsername').value.trim();
+                const errorEl = document.getElementById('changeUsernameError');
+                const successEl = document.getElementById('changeUsernameSuccess');
+
+                errorEl.classList.add('hidden');
+                successEl.classList.add('hidden');
+
+                try {
+                    const response = await API.changeUsername(newUsername);
+
+                    if (response.success) {
+                        successEl.textContent = 'Username updated successfully! Reloading...';
+                        successEl.classList.remove('hidden');
+
+                        // Update auth user object
+                        auth.user.username = newUsername;
+                        sessionStorage.setItem('user', JSON.stringify(auth.user));
+
+                        setTimeout(() => {
+                            closeModal();
+                            this.renderStats(); // Re-render to show new name
+                            auth.updateUI(); // Update navbar
+                        }, 1500);
+                    }
+                } catch (error) {
+                    errorEl.textContent = error.message;
+                    errorEl.classList.remove('hidden');
+                }
+            });
+        }
+    }
+
     render404() {
         const app = document.getElementById('app');
         app.innerHTML = `
-            <div class="home-view">
+                < div class="home-view" >
                 <h1 style="color: var(--neon-magenta);">404</h1>
                 <p>Page not found</p>
                 <button class="btn btn-primary" onclick="window.location.hash='#/'">Go Home</button>
-            </div>
-        `;
+            </div >
+                `;
     }
 
     async renderChangelog() {
