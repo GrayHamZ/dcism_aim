@@ -18,10 +18,24 @@ class API {
         try {
             const url = `${API_BASE}${endpoint}`;
 
+            // Get token from sessionStorage
+            const savedUser = sessionStorage.getItem('user');
+            let token = null;
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                token = user.token;
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const defaultOptions = {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 credentials: 'same-origin'
             };
 

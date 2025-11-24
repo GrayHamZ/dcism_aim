@@ -92,10 +92,14 @@ try {
     $updateStmt->execute();
     $updateStmt->close();
 
+    // Generate and store token
+    $token = generateToken($user['id']);
+
     // Send success response
     sendSuccess([
         'user_id' => $user['id'],
         'username' => $user['username'],
+        'token' => $token,
         'leaderboard_illegible' => (bool)$user['leaderboard_illegible'],
         'ban_reason' => $user['ban_reason']
     ], 'Login successful');

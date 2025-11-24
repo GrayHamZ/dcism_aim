@@ -20,11 +20,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $requestedUserId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 $gameModeId = isset($_GET['mode']) ? (int)$_GET['mode'] : 1; // Default to Classic mode
 
+// Require authentication for all requests to this endpoint
+requireAuth();
+$currentUserId = getCurrentUserId();
+
 // If no user_id provided, use current authenticated user
 if ($requestedUserId === null) {
-    requireAuth();
-    $userId = getCurrentUserId();
+    $userId = $currentUserId;
 } else {
+    // Security check: Ensure user can only access their own stats
+    // Or if you want to allow viewing other's stats, remove this check.
+    // The user request specifically asked: "where he or she could only access his or her data and not any others"
+    if ($requestedUserId !== $currentUserId) {
+        sendError('Unauthorized access to user data', 403);
+    }
     $userId = $requestedUserId;
 }
 

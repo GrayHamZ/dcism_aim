@@ -8,6 +8,14 @@ return [
     'nigga',
     'nigger',
     'faggot',
+    'nazi',
+    'fuck',
+    'shit',
+    'bitch',
+    'dick',
+    'penis',
+    'vagina',
+    'cunt',
     // Add more words here as needed
 ];
 ?>
