@@ -47,6 +47,7 @@ try {
         FROM scores s
         INNER JOIN users u ON s.user_id = u.id
         WHERE s.game_mode_id = ?
+        AND u.leaderboard_illegible = 0
         AND s.id = (
             SELECT s2.id
             FROM scores s2
@@ -84,9 +85,11 @@ try {
 
     // Get total number of players for this game mode
     $countQuery = "
-        SELECT COUNT(DISTINCT user_id) as total_players
-        FROM scores
-        WHERE game_mode_id = ?
+        SELECT COUNT(DISTINCT s.user_id) as total_players
+        FROM scores s
+        INNER JOIN users u ON s.user_id = u.id
+        WHERE s.game_mode_id = ?
+        AND u.leaderboard_illegible = 0
     ";
 
     $countStmt = $conn->prepare($countQuery);
@@ -105,10 +108,12 @@ try {
         $rankQuery = "
             SELECT COUNT(*) + 1 as rank
             FROM (
-                SELECT user_id, MAX(score) as max_score
-                FROM scores
-                WHERE game_mode_id = ?
-                GROUP BY user_id
+                SELECT s.user_id, MAX(s.score) as max_score
+                FROM scores s
+                INNER JOIN users u ON s.user_id = u.id
+                WHERE s.game_mode_id = ?
+                AND u.leaderboard_illegible = 0
+                GROUP BY s.user_id
             ) as user_scores
             WHERE max_score > (
                 SELECT MAX(score)

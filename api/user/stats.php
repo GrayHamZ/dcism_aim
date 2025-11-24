@@ -33,7 +33,7 @@ try {
     $conn = $db->getConnection();
 
     // Get user info
-    $userStmt = $conn->prepare("SELECT id, username, created_at FROM users WHERE id = ?");
+    $userStmt = $conn->prepare("SELECT id, username, created_at, last_username_change, leaderboard_illegible, ban_reason FROM users WHERE id = ?");
     $userStmt->bind_param('i', $userId);
     $userStmt->execute();
     $userResult = $userStmt->get_result();
@@ -171,7 +171,13 @@ try {
         'user' => [
             'id' => (int)$user['id'],
             'username' => $user['username'],
-            'member_since' => $user['created_at']
+            'member_since' => $user['created_at'],
+            'id' => (int)$user['id'],
+            'username' => $user['username'],
+            'member_since' => $user['created_at'],
+            'last_username_change' => $user['last_username_change'],
+            'leaderboard_illegible' => (bool)$user['leaderboard_illegible'],
+            'ban_reason' => $user['ban_reason']
         ],
         'game_mode_id' => $gameModeId,
         'stats' => $userStats,

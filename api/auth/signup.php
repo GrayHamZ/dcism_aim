@@ -37,6 +37,16 @@ if (!validateUsername($username)) {
     sendError('Username must be 3-20 characters and contain only letters, numbers, and underscores');
 }
 
+// Profanity Check
+$profanityList = require __DIR__ . '/../../config/profanity.php';
+$normalizedUsername = strtolower($username);
+
+foreach ($profanityList as $word) {
+    if (strpos($normalizedUsername, $word) !== false) {
+        sendError('Username contains inappropriate language');
+    }
+}
+
 // Validate password strength
 $passwordValidation = validatePassword($password);
 if (!$passwordValidation['valid']) {

@@ -41,7 +41,7 @@ try {
     $conn = $db->getConnection();
 
     // Get user by username
-    $stmt = $conn->prepare("SELECT id, username, password_hash FROM users WHERE username = ?");
+    $stmt = $conn->prepare("SELECT id, username, password_hash, leaderboard_illegible, ban_reason FROM users WHERE username = ?");
     $stmt->bind_param('s', $username);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -95,7 +95,9 @@ try {
     // Send success response
     sendSuccess([
         'user_id' => $user['id'],
-        'username' => $user['username']
+        'username' => $user['username'],
+        'leaderboard_illegible' => (bool)$user['leaderboard_illegible'],
+        'ban_reason' => $user['ban_reason']
     ], 'Login successful');
 
 } catch (Exception $e) {

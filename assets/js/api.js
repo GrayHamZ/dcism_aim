@@ -91,6 +91,13 @@ class API {
         const params = userId ? `user_id=${userId}&mode=${gameModeId}` : `mode=${gameModeId}`;
         return this.request(`/user/stats.php?${params}`);
     }
+
+    static async changeUsername(newUsername) {
+        return this.request('/user/change-username.php', {
+            method: 'POST',
+            body: JSON.stringify({ new_username: newUsername })
+        });
+    }
 }
 
 export default API;
